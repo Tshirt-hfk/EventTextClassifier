@@ -3,29 +3,23 @@ from collections import defaultdict
 import json
 import random
 import torch
-from torch.utils.data import Dataset
 
+LABEL2TYPE = ['一带一路', '东突', '产业经贸', '其他非传统安全', '内政', '军事其他', '军事合作', '军事战略', '军事行动', '军工科技', 
+            '前沿技术', '半岛局势', '印太战略', '国际恐怖', '基础设施', '外交', '太空安全', '宗教', '对华关系', '政治其他', 
+            '政治安全', '政治局势', '政策制度', '敌对反华', '数字经济', '数据安全', '核安全', '武器装备', '民族问题其他', 
+            '民用科技', '民运', '海外利益', '海外安全其他', '海洋安全', '涉恐其他', '涉疆', '涉疆反恐', '涉蒙', '涉藏', 
+            '演习演训', '生物安全', '科技其他', '科技战略', '粮食安全', '经济其他', '经济制裁', '经济政策', '经济治理', 
+            '网络安全其他', '网络战略', '网络攻防', '能源安全', '财政', '迈境问题', '邪教', '非政府组织', '高访安保']
 
 TYPE2LABEL = {
-    "伤人": 0,
-    "咨询": 1,
-    "威胁": 2,
-    "开展合作": 3,
-    "战斗": 4,
-    "抗议": 5,
-    "拒绝": 6,
-    "涉及文件行为": 7,
-    "胁迫": 8,
-    "非常规大规模暴力": 9,
-    "会议活动": 10,
-    "关系建立": 11,
-    "关系降级": 12,
-    "涉国内法行为": 13,
-    "涉国际法行为": 14,
-    "立法行为": 15,
-    "组织机构变更": 16
+    label: idx for idx,label in enumerate(LABEL2TYPE)
 }
-LABEL2TYPE = {v:k for k,v in TYPE2LABEL.items()}
+
+def convert_one_hot(type_list):
+    one_hot = [0 for _ in range(len(LABEL2TYPE))]
+    for t in type_list:
+        one_hot[TYPE2LABEL[t]] = 1
+    return one_hot
 
 class TextDataset:
      def __init__(self, file_path, tokenizer):
@@ -39,7 +33,7 @@ class TextDataset:
                     "input_ids": tokenized_input.input_ids,
                     "attention_mask": tokenized_input.attention_mask,
                     "token_type_ids": tokenized_input.token_type_ids,
-                    "label": TYPE2LABEL[example['label']]
+                    "label": convert_one_hot(example['label'])
                 }
                 self.examples.append(example)
 
@@ -63,7 +57,6 @@ class BatchTextDataset(TextDataset):
         self.max_num_per_label = max_num_per_label
         self.batch_examples = []
         
-
     def __len__(self):
         return len(self.batch_examples)
     
@@ -88,7 +81,7 @@ class BatchTextDataset(TextDataset):
             random.shuffle(self.examples)
             examples_per_label = defaultdict(list)
             for example in self.examples:
-                examples_per_label[example["label"]].append(example)
+                examples_per_label[tuple(example["label"])].append(example)
             max_num = max([len(v) for v in examples_per_label.values()])
             if self.max_num_per_label is not None:
                 max_num = min(max_num, self.max_num_per_label)
@@ -102,6 +95,7 @@ class BatchTextDataset(TextDataset):
                             batch.clear()
             if batch and not self.drop_last:
                 self.batch_examples.append(self.pad_input(batch))
+            random.shuffle(self.batch_examples)
         else:
             max_num = min(len(self.examples), self.max_num_per_label) if self.max_num_per_label is not None else len(self.examples)
             batch = []

@@ -22,10 +22,11 @@ class TextClassifierModel(nn.Module):
         self.num_label = num_label
 
         self.classifier = nn.Sequential(
-            nn.Linear(self.hidden_size, 256),
+            nn.Linear(self.hidden_size, 768),
             nn.GELU(),
             nn.Dropout(dropout_prob),
-            nn.Linear(256, num_label)
+            nn.Linear(768, num_label),
+            nn.Sigmoid()
         )
 
     def forward(self, input_ids, attention_mask, token_type_ids=None):
@@ -41,9 +42,6 @@ class TextClassifierModel(nn.Module):
         return text_logit
 
     def calc_loss(self, text_logit, text_label):
-        
-        text_logit = torch.reshape(text_logit, [-1, self.num_label])
-        text_label = torch.reshape(text_label, [-1])
-        text_loss = F.cross_entropy(text_logit, text_label, reduction='mean')
-
+        text_label = text_label.type_as(text_logit)
+        text_loss = F.binary_cross_entropy(text_logit, text_label)
         return text_loss
